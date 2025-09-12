@@ -15,7 +15,10 @@ class SleepMonitor
     'runningboardd',           # Process lifecycle daemon
     'coreaudiod',              # Core Audio daemon
     'sharingd',                # File sharing daemon
-    'useractivityd'            # User activity tracking daemon
+    'useractivityd',           # User activity tracking daemon
+    'cloudd',                  # iCloud sync daemon
+    'appstoreagent',           # App Store background agent
+    'AddressBookSourceSync'    # Contacts sync service
   ].freeze
   
   def initialize(filter_system_services: true)
@@ -44,6 +47,27 @@ class SleepMonitor
         sleep 5
       end
     end
+  end
+
+  def test_notifications
+    puts "Testing notification add and removal..."
+    
+    # Send test notification
+    puts "Sending test notification..."
+    TerminalNotifier.notify("This is a test notification", 
+      title: "Test Alert",
+      subtitle: "Testing notification system",
+      group: NOTIFICATION_ID
+    )
+    
+    puts "Notification sent. Waiting 5 seconds..."
+    sleep 5
+    
+    # Remove test notification
+    puts "Removing notification..."
+    remove_notification
+    
+    puts "Notification removal attempted. Test complete."
   end
 
   private
@@ -101,8 +125,7 @@ class SleepMonitor
     TerminalNotifier.notify(app_list, 
       title: "Sleep Prevention Alert",
       subtitle: subtitle,
-      group: NOTIFICATION_ID,
-      sender: "com.apple.systempreferences"
+      group: NOTIFICATION_ID
     )
     
     puts "Notification sent: #{apps.map { |app| app[:process] }.join(', ')}"
@@ -116,6 +139,13 @@ end
 
 if __FILE__ == $0
   # Check for command line arguments
+  if ARGV.include?('--test')
+    puts "Running notification test..."
+    monitor = SleepMonitor.new
+    monitor.test_notifications
+    exit 0
+  end
+  
   filter_system_services = !ARGV.include?('--no-filter')
   
   puts "System service filtering: #{filter_system_services ? 'enabled' : 'disabled'}"
