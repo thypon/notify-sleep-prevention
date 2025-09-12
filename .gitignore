@@ -1,0 +1,33 @@
+# Bundler
+Gemfile.lock
+
+# Logs
+*.log
+
+# macOS
+.DS_Store
+
+# Ruby
+*.gem
+*.rbc
+/.config
+/coverage/
+/InstalledFiles
+/pkg/
+/spec/reports/
+/spec/tmp/
+/tmp/
+
+# RVM
+/.rvmrc
+
+# rbenv
+.ruby-version
+.ruby-gemset
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
