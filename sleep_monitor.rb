@@ -18,7 +18,8 @@ class SleepMonitor
     'useractivityd',           # User activity tracking daemon
     'cloudd',                  # iCloud sync daemon
     'appstoreagent',           # App Store background agent
-    'AddressBookSourceSync'    # Contacts sync service
+    'AddressBookSourceSync',   # Contacts sync service
+    'bluetoothd'               # Bluetooth daemon
   ].freeze
   
   def initialize(filter_system_services: true)
