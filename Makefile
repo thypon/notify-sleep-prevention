@@ -48,6 +48,7 @@ install: ## Install the sleep monitor as a macOS startup service
 	echo '        <string>exec</string>' >> $(PLIST_FILE); \
 	echo '        <string>ruby</string>' >> $(PLIST_FILE); \
 	echo '        <string>sleep_monitor.rb</string>' >> $(PLIST_FILE); \
+	echo '        <string>--auto-kill</string>' >> $(PLIST_FILE); \
 	echo '    </array>' >> $(PLIST_FILE); \
 	echo '    <key>EnvironmentVariables</key>' >> $(PLIST_FILE); \
 	echo '    <dict>' >> $(PLIST_FILE); \
