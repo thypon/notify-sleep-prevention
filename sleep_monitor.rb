@@ -37,7 +37,6 @@ class SleepMonitor
     @auto_kill_threshold = auto_kill_threshold # in seconds (default: 5 minutes)
     @app_start_times = {} # Track when each app started preventing sleep
     @last_notification_content = nil # Track last notification to avoid unnecessary updates
-    @original_low_power_mode = get_low_power_mode_state # Store original state
     @low_power_mode_disabled = false # Track if we disabled it
     @sudo_warning_shown = false # Track if we've shown the sudo warning
   end
@@ -45,17 +44,24 @@ class SleepMonitor
   def run
     puts "Starting sleep prevention monitor..."
     puts "Auto-kill: #{@auto_kill ? "enabled (threshold: #{@auto_kill_threshold / 60} minutes)" : "disabled"}"
-    puts "Low power mode: #{@original_low_power_mode == 1 ? "enabled" : "disabled"} (will be disabled when apps prevent sleep)"
+    puts "Low power mode: managed based on power adapter connection"
+
+    # Set initial low power mode state based on power source
+    initialize_low_power_mode
 
     loop do
       begin
         preventing_apps = get_sleep_preventing_apps
+        on_ac_power = is_on_ac_power?
+
+        # Manage low power mode based on current power source and app state
+        manage_low_power_mode(on_ac_power, preventing_apps.any?)
 
         if preventing_apps.any?
-          handle_apps_preventing_sleep(preventing_apps)
+          handle_apps_preventing_sleep(preventing_apps, on_ac_power)
           check_and_kill_long_running_apps(preventing_apps) if @auto_kill
         else
-          handle_no_apps_preventing_sleep
+          handle_no_apps_preventing_sleep(on_ac_power)
         end
 
         sleep 5
@@ -88,6 +94,58 @@ class SleepMonitor
   end
 
   private
+
+  def initialize_low_power_mode
+    on_ac_power = is_on_ac_power?
+    preventing_apps = get_sleep_preventing_apps
+
+    if on_ac_power
+      puts "On AC power - ensuring low power mode is disabled..."
+      set_low_power_mode(false)
+    elsif preventing_apps.any?
+      puts "On battery power with apps preventing sleep - ensuring low power mode is disabled..."
+      set_low_power_mode(false)
+      @low_power_mode_disabled = true
+    else
+      puts "On battery power with no apps preventing sleep - ensuring low power mode is enabled..."
+      set_low_power_mode(true)
+    end
+  end
+
+  def is_on_ac_power?
+    output = `pmset -g ps`
+    output.include?("AC Power")
+  end
+
+  def manage_low_power_mode(on_ac_power, apps_preventing_sleep)
+    current_lpm_state = get_low_power_mode_state
+
+    if on_ac_power
+      # On AC power: always keep low power mode disabled
+      if current_lpm_state == 1
+        puts "Switched to AC power - disabling low power mode..."
+        set_low_power_mode(false)
+      end
+      @low_power_mode_disabled = false
+    elsif apps_preventing_sleep
+      # On battery with apps preventing sleep: disable low power mode
+      if current_lpm_state == 1 && !@low_power_mode_disabled
+        puts "On battery with apps preventing sleep - disabling low power mode..."
+        set_low_power_mode(false)
+        @low_power_mode_disabled = true
+      end
+    else
+      # On battery with no apps preventing sleep: enable low power mode
+      if current_lpm_state == 0 && @low_power_mode_disabled
+        puts "On battery with no apps preventing sleep - enabling low power mode..."
+        set_low_power_mode(true)
+        @low_power_mode_disabled = false
+      elsif current_lpm_state == 0 && !@low_power_mode_disabled
+        # Ensure it's enabled even if we didn't disable it
+        set_low_power_mode(true)
+      end
+    end
+  end
 
   def get_low_power_mode_state
     output = `pmset -g | grep lowpowermode`
@@ -134,16 +192,9 @@ class SleepMonitor
     apps
   end
 
-  def handle_apps_preventing_sleep(apps)
+  def handle_apps_preventing_sleep(apps, on_ac_power)
     app_names = apps.map { |app| app[:process] }.to_set
     current_time = Time.now
-
-    # Disable low power mode if not already disabled and it was originally enabled
-    if !@low_power_mode_disabled && @original_low_power_mode == 1
-      puts "Disabling low power mode to speed up task completion..."
-      set_low_power_mode(false)
-      @low_power_mode_disabled = true
-    end
 
     # Track new apps
     app_names.each do |app_name|
@@ -171,20 +222,13 @@ class SleepMonitor
     send_notification(apps)
   end
 
-  def handle_no_apps_preventing_sleep
+  def handle_no_apps_preventing_sleep(on_ac_power)
     if @notification_active
       remove_notification
       @current_preventing_apps.clear
       @app_start_times.clear
       @notification_active = false
       @last_notification_content = nil
-
-      # Restore low power mode to original state if we disabled it
-      if @low_power_mode_disabled && @original_low_power_mode == 1
-        puts "Restoring low power mode to original state..."
-        set_low_power_mode(true)
-        @low_power_mode_disabled = false
-      end
 
       puts "No apps preventing sleep - notification removed"
     end
