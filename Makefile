@@ -149,10 +149,14 @@ install_test: ## Install the sleep monitor as a test service (runs --test once)
 
 uninstall: ## Remove the sleep monitor service from macOS startup
 	@echo "Uninstalling Sleep Prevention Monitor..."
+	@# First kill the service if running
+	@-launchctl kill TERM $(SERVICE_NAME) 2>/dev/null
 	@# Stop the service if running
 	@-launchctl stop $(SERVICE_NAME) 2>/dev/null
 	@# Unload the service
 	@-launchctl unload $(PLIST_FILE) 2>/dev/null
+	@# Also try bootout for modern macOS
+	@-launchctl bootout gui/$$(id -u)/$(SERVICE_NAME) 2>/dev/null
 	@# Remove the plist file
 	@if [ -f $(PLIST_FILE) ]; then \
 		rm $(PLIST_FILE); \
